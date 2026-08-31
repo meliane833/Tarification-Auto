@@ -103,14 +103,14 @@ c'est lui qui produit tous les `.pkl` ci-dessus, dans sa dernière section.
 
 ## L'application
 
-Trois onglets :
+Une page unique. La **période de couverture** se saisit dans la barre latérale — dates d'effet et
+d'échéance — et l'exposition en est déduite automatiquement, avec la convention semi-ouverte
+utilisée à l'entraînement. Le formulaire principal recueille les caractéristiques du risque.
 
-1. **Tarification d'un contrat** — l'utilisateur saisit une *période de couverture* et les
-   caractéristiques du risque ; l'exposition est calculée par l'application. La prime du modèle
-   retenu est affichée aux côtés de celles des quatre autres.
-2. **Grille tarifaire** — tarif de base d'un profil de référence modifiable, puis relativité de
-   chaque modalité, exportable en CSV.
-3. **Comparaison des modèles** — déviances, Gini, ratios de calibration et méthodologie.
+Au calcul, l'application affiche la prime pure du modèle retenu, puis un tableau comparant les cinq
+modèles : prime, écart au modèle retenu, et déviance hors échantillon. Un bouton exporte une fiche
+client au format PDF, reprenant la période, les caractéristiques saisies et la seule prime du modèle
+retenu.
 
 En local :
 
@@ -119,11 +119,15 @@ pip install -r requirements.txt
 python -m streamlit run app_tarification.py
 ```
 
-Les fichiers `.pkl` doivent se trouver dans le même dossier que le script.
+Les fichiers de modèles doivent se trouver dans le même dossier que le script.
 
 > **Compatibilité des versions.** Les `.pkl` sont sérialisés avec les versions de bibliothèques de
-> l'environnement d'entraînement. Si le déploiement échoue au chargement, aligner
-> `requirements.txt` sur les versions affichées par le notebook après exécution.
+> l'environnement d'entraînement, et ne se rechargent pas sous d'autres versions. Si le déploiement
+> échoue au chargement, aligner `requirements.txt` sur les versions affichées par le notebook après
+> exécution — et vérifier la version de Python choisie sur Streamlit Cloud, qui doit être celle de
+> l'environnement d'entraînement (3.13). XGBoost et LightGBM échappent à cette contrainte : ils sont
+> sérialisés dans leur format natif, `.json` et `.txt`, portable d'une version à l'autre.
+
 
 ## Avertissement
 
@@ -135,4 +139,4 @@ vocation à être transposés tels quels à un autre marché.
 
 ## Auteur
 
-WOGNIN Méliane — M1 Actuariat
+WOGNIN Méliane & Aboulé Guy Roland — M1 Actuariat
