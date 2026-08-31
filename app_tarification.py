@@ -17,6 +17,7 @@ Lancement :
 from datetime import date
 
 import joblib
+from fpdf import FPDF
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -107,10 +108,17 @@ def primes_tous_modeles(client: dict, exposition: float, M: dict):
     }, {"frequence": freq, "cout_moyen": cout}
 
 
-def fiche_client(client: dict, debut, fin, exposition: float, prime: float) -> str:
-    """Fiche d'une page destinée au client : caractéristiques saisies et prime retenue."""
+def fiche_client(client: dict, debut, fin, exposition: float, prime: float) -> bytes:
+    """Fiche d'une page destinée au client, au format PDF."""
     oui_non = {0: "Non", 1: "Oui"}
-    lignes = [
+    nb_jours = (pd.Timestamp(fin) - pd.Timestamp(debut)).days
+
+    periode = [
+        ("Date d'effet", f"{debut:%d/%m/%Y}"),
+        ("Date d'échéance", f"{fin:%d/%m/%Y}"),
+        ("Durée", f"{nb_jours} jours ({exposition:.3f} année)"),
+    ]
+    risque = [
         ("Âge de l'assuré", f"{client['Age_assure']} ans"),
         ("Ancienneté du permis", f"{client['Anciennete_permis']} ans"),
         ("Ancienneté client", f"{client['Seniority']} ans"),
@@ -122,54 +130,70 @@ def fiche_client(client: dict, debut, fin, exposition: float, prime: float) -> s
         ("Carburant", LIB_FUEL[client["Type_fuel"]]),
         ("Âge du véhicule", f"{client['Age_vehicule']} ans"),
         ("Puissance", f"{client['Power']} ch"),
-        ("Cylindrée", f"{client['Cylinder_capacity']} cm³"),
-        ("Valeur du véhicule", f"{client['Value_vehicle']:,.0f} €".replace(",", " ")),
+        ("Cylindrée", f"{client['Cylinder_capacity']} cm3"),
+        ("Valeur du véhicule", f"{client['Value_vehicle']:,.0f} EUR".replace(",", " ")),
         ("Poids", f"{client['Weight']} kg"),
         ("Longueur", f"{client['Length']} m"),
-        ("Nombre de portes", client["N_doors"]),
+        ("Nombre de portes", str(client["N_doors"])),
     ]
-    corps = "".join(f"<tr><td>{intitule}</td><td>{valeur}</td></tr>" for intitule, valeur in lignes)
-    nb_jours = (pd.Timestamp(fin) - pd.Timestamp(debut)).days
 
-    return f"""<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
-<title>Proposition tarifaire</title><style>
- body{{font-family:Georgia,'Times New Roman',serif;color:#1a202c;max-width:720px;
-      margin:40px auto;padding:0 24px;line-height:1.5}}
- h1{{font-size:22px;margin:0 0 4px}}
- .sous{{color:#64748b;font-size:13px;margin-bottom:28px}}
- .prime{{border:2px solid #1e2761;border-radius:6px;padding:18px 22px;margin:24px 0;
-         display:flex;justify-content:space-between;align-items:baseline}}
- .prime .lib{{font-size:14px;color:#1e2761}}
- .prime .val{{font-size:30px;font-weight:bold;color:#1e2761}}
- h2{{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;
-     margin:26px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}}
- table{{width:100%;border-collapse:collapse;font-size:14px}}
- td{{padding:5px 0;border-bottom:1px solid #f1f5f9}}
- td:last-child{{text-align:right;font-weight:bold}}
- .avert{{margin-top:28px;font-size:11px;color:#64748b;line-height:1.45}}
- @media print{{body{{margin:0}}}}
-</style></head><body>
-<h1>Proposition tarifaire — assurance automobile</h1>
-<div class="sous">Éditée le {date.today():%d/%m/%Y}</div>
+    pdf = FPDF(format="A4", unit="mm")
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.add_page()
+    pdf.set_margins(20, 18, 20)
+    largeur = pdf.w - 40
 
-<h2>Période de couverture</h2>
-<table>
-  <tr><td>Date d'effet</td><td>{debut:%d/%m/%Y}</td></tr>
-  <tr><td>Date d'échéance</td><td>{fin:%d/%m/%Y}</td></tr>
-  <tr><td>Durée</td><td>{nb_jours} jours ({exposition:.3f} année)</td></tr>
-</table>
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(largeur, 9, "Proposition tarifaire - assurance automobile", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(110, 118, 130)
+    pdf.cell(largeur, 6, f"Éditée le {date.today():%d/%m/%Y}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(6)
 
-<div class="prime"><span class="lib">Prime pure pour la période</span>
-<span class="val">{prime:,.2f} €</span></div>
+    def section(titre, lignes):
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(110, 118, 130)
+        pdf.cell(largeur, 6, titre.upper(), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_draw_color(210, 215, 225)
+        pdf.line(20, pdf.get_y(), 20 + largeur, pdf.get_y())
+        pdf.ln(2)
+        pdf.set_text_color(0, 0, 0)
+        for intitule, valeur in lignes:
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(largeur * 0.6, 7, intitule)
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(largeur * 0.4, 7, str(valeur), align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
 
-<h2>Caractéristiques du risque</h2>
-<table>{corps}</table>
+    section("Période de couverture", periode)
 
-<p class="avert">La prime indiquée est une <strong>prime pure</strong> : l'espérance de la charge de
-sinistres sur la période de couverture. Elle n'intègre ni frais de gestion, ni commissions, ni
-marge, ni taxes, et ne constitue donc pas un tarif commercial. Estimation produite par un modèle
-statistique calibré sur un portefeuille historique ; elle ne vaut pas engagement de garantie.</p>
-</body></html>"""
+    pdf.set_draw_color(30, 39, 97)
+    pdf.set_line_width(0.6)
+    y0 = pdf.get_y()
+    pdf.rect(20, y0, largeur, 18)
+    pdf.set_xy(24, y0 + 5)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(30, 39, 97)
+    pdf.cell(largeur * 0.55, 8, "Prime pure pour la période")
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(largeur * 0.4, 8, f"{prime:,.2f} EUR".replace(",", " "), align="R")
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_line_width(0.2)
+    pdf.set_xy(20, y0 + 24)
+
+    section("Caractéristiques du risque", risque)
+
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(110, 118, 130)
+    pdf.multi_cell(largeur, 4,
+                   "La prime indiquée est une prime pure : l'espérance de la charge de sinistres "
+                   "sur la période de couverture. Elle n'intègre ni frais de gestion, ni "
+                   "commissions, ni marge, ni taxes, et ne constitue donc pas un tarif commercial. "
+                   "Estimation produite par un modèle statistique calibré sur un portefeuille "
+                   "historique ; elle ne vaut pas engagement de garantie.")
+
+    return bytes(pdf.output())
 
 
 # Valeurs par défaut : profil médian du portefeuille
@@ -281,11 +305,9 @@ if calcul:
     # ------------------------------------------------------------ export client
     st.divider()
     st.download_button(
-        "📄 Exporter la fiche client",
-        data=fiche_client(client, debut, fin, expo, toutes[MEILLEUR]).encode("utf-8"),
-        file_name=f"proposition_tarifaire_{debut:%Y%m%d}.html",
-        mime="text/html",
+        "📄 Exporter la fiche client (PDF)",
+        data=fiche_client(client, debut, fin, expo, toutes[MEILLEUR]),
+        file_name=f"proposition_tarifaire_{debut:%Y%m%d}.pdf",
+        mime="application/pdf",
     )
-    st.caption("Fiche d'une page reprenant les caractéristiques saisies et la prime retenue. "
-               "Ouvrez le fichier dans un navigateur puis Ctrl+P pour l'imprimer ou l'enregistrer "
-               "en PDF.")
+    st.caption("Fiche d'une page reprenant les caractéristiques saisies et la prime retenue.")
