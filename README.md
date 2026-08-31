@@ -4,7 +4,7 @@ Projet de Data Science, M1 Actuariat. Estimation de la prime pure d'un contrat a
 d'un portefeuille réel, comparaison de cinq modèles, et mise à disposition du tarif via une
 application Streamlit.
 
-**Application en ligne :** _(à compléter avec l'URL Streamlit après déploiement)_
+**Application en ligne :** https://tarification-auto.streamlit.app/
 
 ## Données
 
